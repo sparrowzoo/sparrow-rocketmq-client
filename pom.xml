@@ -14,8 +14,8 @@
     <dependencies>
         <dependency>
             <groupId>com.sparrow</groupId>
-            <artifactId>sparrow-facade</artifactId>
-            <version>${sparrow_facade_version}</version>
+            <artifactId>sparrow</artifactId>
+            <version>${sparrow_version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.rocketmq</groupId>
