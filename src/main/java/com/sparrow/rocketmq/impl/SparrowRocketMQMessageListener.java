@@ -41,14 +41,19 @@ import org.slf4j.LoggerFactory;
  */
 public class SparrowRocketMQMessageListener implements MessageListenerConcurrently {
 
-    public SparrowRocketMQMessageListener(){
+    public SparrowRocketMQMessageListener() {
         System.out.println("init spring rocket mq message listener");
     }
+
     private static Logger logger = LoggerFactory.getLogger(SparrowRocketMQMessageListener.class);
 
     private QueueHandlerMappingContainer queueHandlerMappingContainer = MQContainerProvider.getContainer();
     private MessageConverter messageConverter;
     private CacheClient cacheClient;
+
+    public void setCacheClient(CacheClient cacheClient) {
+        this.cacheClient = cacheClient;
+    }
 
     public void setQueueHandlerMappingContainer(QueueHandlerMappingContainer queueHandlerMappingContainer) {
         this.queueHandlerMappingContainer = queueHandlerMappingContainer;
@@ -58,20 +63,23 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
         this.messageConverter = messageConverter;
     }
 
-    protected boolean before(MQEvent event,KEY monitor, String keys) {
-        logger.info("starting sparrow consume {},monitor {}, keys {}...",event,monitor,keys);
-        if (monitor==null) {
+    protected boolean before(MQEvent event, KEY monitor, String keys) {
+        if (cacheClient == null) {
+            return true;
+        }
+        logger.info("starting sparrow consume {},monitor {}, keys {}...", event, monitor, keys);
+        if (monitor == null) {
             return true;
         }
         try {
-            return !cacheClient.set().exist(monitor,keys);
+            return !cacheClient.set().exist(monitor, keys);
         } catch (CacheConnectionException e) {
             return true;
         }
     }
 
-    protected void after(MQEvent event,KEY monitor,String keys) {
-        logger.info("ending sparrow consume {},monitor {},keys {} ...",event,monitor,keys);
+    protected void after(MQEvent event, KEY monitor, String keys) {
+        logger.info("ending sparrow consume {},monitor {},keys {} ...", event, monitor, keys);
         if (StringUtility.isNullOrEmpty(monitor)) {
             return;
         }
@@ -90,12 +98,12 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
             MQHandler handler = queueHandlerMappingContainer.get(type);
             try {
                 MQEvent event = messageConverter.fromMessage(message);
-                KEY monitor=KEY.parse(message.getProperties().get(MQ_CLIENT.MONITOR_KEY));
-                if(!this.before(event,monitor,message.getKeys())){
+                KEY monitor = KEY.parse(message.getProperties().get(MQ_CLIENT.MONITOR_KEY));
+                if (!this.before(event, monitor, message.getKeys())) {
                     return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
                 }
                 handler.handle(event);
-                this.after(event,monitor,message.getKeys());
+                this.after(event, monitor, message.getKeys());
             } catch (Throwable e) {
                 logger.error("message error", e);
             }

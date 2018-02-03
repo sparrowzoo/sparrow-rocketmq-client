@@ -20,12 +20,12 @@ package com.sparrow.rocketmq.impl;
 import com.sparrow.cache.CacheClient;
 import com.sparrow.constant.cache.KEY;
 import com.sparrow.container.Container;
+import com.sparrow.core.spi.JsonFactory;
 import com.sparrow.mq.MQEvent;
 import com.sparrow.mq.MQMessageSendException;
 import com.sparrow.mq.MQPublisher;
 import com.sparrow.mq.MQ_CLIENT;
 import com.sparrow.rocketmq.MessageConverter;
-import com.sparrow.support.latch.DistributedCountDownLatch;
 import com.sparrow.support.redis.impl.RedisDistributedCountDownLatch;
 import java.util.Collections;
 import java.util.UUID;
@@ -110,6 +110,9 @@ public class SparrowRocketMQPublisher implements MQPublisher {
     }
 
     public void after(MQEvent event, KEY monitor, String msgKey) {
+        if (cacheClient == null) {
+            return;
+        }
         if (monitor == null) {
             return;
         }
@@ -130,7 +133,7 @@ public class SparrowRocketMQPublisher implements MQPublisher {
         if (monitor != null) {
             msg.getProperties().put(MQ_CLIENT.MONITOR_KEY, monitor.key());
         }
-        logger.info("event {} ,key {},msgKey {}", event, monitor, key);
+        logger.info("event {} ,key {},msgKey {}", JsonFactory.getProvider().toString(event), monitor.key(), key);
         SendResult sendResult = null;
         int retryTimes = 0;
         while (retryTimes < retryTimesWhenSendAsyncFailed) {
@@ -139,7 +142,7 @@ public class SparrowRocketMQPublisher implements MQPublisher {
                 logger.warn("event {} retry times {}", event, retryTimes);
             }
             try {
-                if (this.debug) {
+                if (this.debug != null && this.debug) {
                     logger.debug("sparrow rocket mq sender debug,msg:{}", msg);
                 } else {
                     sendResult = producer.send(msg);
@@ -162,7 +165,10 @@ public class SparrowRocketMQPublisher implements MQPublisher {
         DefaultMQProducer producer = new DefaultMQProducer(group);
         producer.setNamesrvAddr(nameServerAddress);
         producer.setInstanceName(MQ_CLIENT.INSTANCE_NAME);
-        producer.setCreateTopicKey(this.getTopic());
+        //for product
+        if (this.debug == null || !this.debug) {
+            producer.setCreateTopicKey(this.getTopic());
+        }
 
         int maxMessageSize = 1024000;
         producer.setMaxMessageSize(maxMessageSize);
