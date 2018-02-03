@@ -19,6 +19,7 @@ package com.sparrow.rocketmq.impl;
 
 import com.sparrow.cache.CacheClient;
 import com.sparrow.constant.cache.KEY;
+import com.sparrow.core.spi.JsonFactory;
 import com.sparrow.exception.CacheConnectionException;
 import com.sparrow.mq.MQContainerProvider;
 import com.sparrow.mq.MQEvent;
@@ -67,7 +68,7 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
         if (cacheClient == null) {
             return true;
         }
-        logger.info("starting sparrow consume {},monitor {}, keys {}...", event, monitor, keys);
+        logger.info("starting sparrow consume {},monitor {}, keys {}...", JsonFactory.getProvider().toString(event), monitor==null?"null":monitor.key(), keys);
         if (monitor == null) {
             return true;
         }
@@ -79,12 +80,14 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
     }
 
     protected void after(MQEvent event, KEY monitor, String keys) {
-        logger.info("ending sparrow consume {},monitor {},keys {} ...", event, monitor, keys);
+        if (cacheClient == null) {
+            return;
+        }
+        logger.info("ending sparrow consume {},monitor {},keys {} ...", JsonFactory.getProvider().toString(event), monitor==null?"null":monitor.key(), keys);
         if (StringUtility.isNullOrEmpty(monitor)) {
             return;
         }
-        RedisDistributedCountDownLatch redisDistributedCountDownLatch = new RedisDistributedCountDownLatch(cacheClient, monitor);
-        redisDistributedCountDownLatch.consume(keys);
+        new RedisDistributedCountDownLatch(cacheClient, monitor).consume(keys);
     }
 
     @Override
@@ -96,6 +99,10 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
                 logger.info("receive msg:" + message.toString());
             }
             MQHandler handler = queueHandlerMappingContainer.get(type);
+            if (handler == null) {
+                logger.warn("handler of this type [{}] not found",type);
+                return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
+            }
             try {
                 MQEvent event = messageConverter.fromMessage(message);
                 KEY monitor = KEY.parse(message.getProperties().get(MQ_CLIENT.MONITOR_KEY));
