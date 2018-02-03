@@ -25,6 +25,7 @@ import com.sparrow.mq.MQMessageSendException;
 import com.sparrow.mq.MQPublisher;
 import com.sparrow.mq.MQ_CLIENT;
 import com.sparrow.rocketmq.MessageConverter;
+import com.sparrow.support.latch.DistributedCountDownLatch;
 import com.sparrow.support.redis.impl.RedisDistributedCountDownLatch;
 import java.util.Collections;
 import java.util.UUID;
@@ -47,7 +48,7 @@ public class SparrowRocketMQPublisher implements MQPublisher {
     private String topic;
     private String tag;
     private CacheClient cacheClient;
-
+    private Boolean debug;
     private MQProducer producer;
     private MessageConverter messageConverter;
     private Integer retryTimesWhenSendAsyncFailed = 5;
@@ -104,12 +105,15 @@ public class SparrowRocketMQPublisher implements MQPublisher {
         this.retryTimesWhenSendAsyncFailed = retryTimesWhenSendAsyncFailed;
     }
 
+    public void setDebug(Boolean debug) {
+        this.debug = debug;
+    }
+
     public void after(MQEvent event, KEY monitor, String msgKey) {
         if (monitor == null) {
             return;
         }
-        RedisDistributedCountDownLatch redisDistributedCountDownLatch = new RedisDistributedCountDownLatch(cacheClient, monitor);
-        redisDistributedCountDownLatch.product(msgKey);
+        new RedisDistributedCountDownLatch(cacheClient, monitor).product(msgKey);
     }
 
     @Override
@@ -120,12 +124,11 @@ public class SparrowRocketMQPublisher implements MQPublisher {
     @Override
     public void publish(MQEvent event, KEY monitor) {
 
-
         Message msg = this.messageConverter.createMessage(topic, tag, event);
         String key = UUID.randomUUID().toString();
         msg.setKeys(Collections.singletonList(key));
         if (monitor != null) {
-            msg.getProperties().put(MQ_CLIENT.MONITOR_KEY,monitor.key());
+            msg.getProperties().put(MQ_CLIENT.MONITOR_KEY, monitor.key());
         }
         logger.info("event {} ,key {},msgKey {}", event, monitor, key);
         SendResult sendResult = null;
@@ -136,9 +139,13 @@ public class SparrowRocketMQPublisher implements MQPublisher {
                 logger.warn("event {} retry times {}", event, retryTimes);
             }
             try {
-                sendResult = producer.send(msg);
-                if (!sendResult.getSendStatus().equals(SendStatus.SEND_OK)) {
-                    throw new MQMessageSendException(sendResult.toString());
+                if (this.debug) {
+                    logger.debug("sparrow rocket mq sender debug,msg:{}", msg);
+                } else {
+                    sendResult = producer.send(msg);
+                    if (!sendResult.getSendStatus().equals(SendStatus.SEND_OK)) {
+                        throw new MQMessageSendException(sendResult.toString());
+                    }
                 }
                 this.after(event, monitor, key);
                 break;
