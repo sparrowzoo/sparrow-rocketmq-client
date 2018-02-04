@@ -27,6 +27,7 @@ import com.sparrow.mq.MQHandler;
 import com.sparrow.mq.MQ_CLIENT;
 import com.sparrow.mq.QueueHandlerMappingContainer;
 import com.sparrow.rocketmq.MessageConverter;
+import com.sparrow.support.latch.DistributedCountDownLatch;
 import com.sparrow.support.redis.impl.RedisDistributedCountDownLatch;
 import com.sparrow.utility.StringUtility;
 import java.util.List;
@@ -50,10 +51,10 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
 
     private QueueHandlerMappingContainer queueHandlerMappingContainer = MQContainerProvider.getContainer();
     private MessageConverter messageConverter;
-    private CacheClient cacheClient;
+    private DistributedCountDownLatch distributedCountDownLatch;
 
-    public void setCacheClient(CacheClient cacheClient) {
-        this.cacheClient = cacheClient;
+    public void setDistributedCountDownLatch(DistributedCountDownLatch distributedCountDownLatch) {
+        this.distributedCountDownLatch = distributedCountDownLatch;
     }
 
     public void setQueueHandlerMappingContainer(QueueHandlerMappingContainer queueHandlerMappingContainer) {
@@ -65,29 +66,22 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
     }
 
     protected boolean before(MQEvent event, KEY monitor, String keys) {
-        if (cacheClient == null) {
+        if (distributedCountDownLatch == null) {
             return true;
         }
-        logger.info("starting sparrow consume {},monitor {}, keys {}...", JsonFactory.getProvider().toString(event), monitor==null?"null":monitor.key(), keys);
-        if (monitor == null) {
-            return true;
-        }
-        try {
-            return !cacheClient.set().exist(monitor, keys);
-        } catch (CacheConnectionException e) {
-            return true;
-        }
+        logger.info("starting sparrow consume {},monitor {}, keys {}...", JsonFactory.getProvider().toString(event), monitor == null ? "null" : monitor.key(), keys);
+        return monitor == null || !distributedCountDownLatch.exist(monitor, keys);
     }
 
     protected void after(MQEvent event, KEY monitor, String keys) {
-        if (cacheClient == null) {
+        if (distributedCountDownLatch == null) {
             return;
         }
         logger.info("ending sparrow consume {},monitor {},keys {} ...", JsonFactory.getProvider().toString(event), monitor==null?"null":monitor.key(), keys);
         if (StringUtility.isNullOrEmpty(monitor)) {
             return;
         }
-        new RedisDistributedCountDownLatch(cacheClient, monitor).consume(keys);
+        distributedCountDownLatch.consume(monitor,keys);
     }
 
     @Override

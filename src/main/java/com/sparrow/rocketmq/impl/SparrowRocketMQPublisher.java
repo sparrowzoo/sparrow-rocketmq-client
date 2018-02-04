@@ -17,7 +17,6 @@
 
 package com.sparrow.rocketmq.impl;
 
-import com.sparrow.cache.CacheClient;
 import com.sparrow.constant.cache.KEY;
 import com.sparrow.container.Container;
 import com.sparrow.core.spi.JsonFactory;
@@ -26,7 +25,7 @@ import com.sparrow.mq.MQMessageSendException;
 import com.sparrow.mq.MQPublisher;
 import com.sparrow.mq.MQ_CLIENT;
 import com.sparrow.rocketmq.MessageConverter;
-import com.sparrow.support.redis.impl.RedisDistributedCountDownLatch;
+import com.sparrow.support.latch.DistributedCountDownLatch;
 import java.util.Collections;
 import java.util.UUID;
 import org.apache.rocketmq.client.exception.MQClientException;
@@ -47,14 +46,14 @@ public class SparrowRocketMQPublisher implements MQPublisher {
     private String group;
     private String topic;
     private String tag;
-    private CacheClient cacheClient;
+    private DistributedCountDownLatch distributedCountDownLatch;
     private Boolean debug;
     private MQProducer producer;
     private MessageConverter messageConverter;
     private Integer retryTimesWhenSendAsyncFailed = 5;
 
-    public void setCacheClient(CacheClient cacheClient) {
-        this.cacheClient = cacheClient;
+    public void setDistributedCountDownLatch(DistributedCountDownLatch distributedCountDownLatch) {
+        this.distributedCountDownLatch = distributedCountDownLatch;
     }
 
     public String getNameServerAddress() {
@@ -110,13 +109,13 @@ public class SparrowRocketMQPublisher implements MQPublisher {
     }
 
     public void after(MQEvent event, KEY monitor, String msgKey) {
-        if (cacheClient == null) {
+        if (distributedCountDownLatch == null) {
             return;
         }
         if (monitor == null) {
             return;
         }
-        new RedisDistributedCountDownLatch(cacheClient, monitor).product(msgKey);
+        distributedCountDownLatch.product(monitor,msgKey);
     }
 
     @Override
