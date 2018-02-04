@@ -109,10 +109,7 @@ public class SparrowRocketMQPublisher implements MQPublisher {
     }
 
     public void after(MQEvent event, KEY monitor, String msgKey) {
-        if (distributedCountDownLatch == null) {
-            return;
-        }
-        if (monitor == null) {
+        if (distributedCountDownLatch == null||monitor==null) {
             return;
         }
         distributedCountDownLatch.product(monitor,msgKey);

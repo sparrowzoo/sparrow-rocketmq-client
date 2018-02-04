@@ -70,7 +70,7 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
             return true;
         }
         logger.info("starting sparrow consume {},monitor {}, keys {}...", JsonFactory.getProvider().toString(event), monitor == null ? "null" : monitor.key(), keys);
-        return monitor == null || !distributedCountDownLatch.exist(monitor, keys);
+        return monitor == null || distributedCountDownLatch.exist(monitor, keys);
     }
 
     protected void after(MQEvent event, KEY monitor, String keys) {
