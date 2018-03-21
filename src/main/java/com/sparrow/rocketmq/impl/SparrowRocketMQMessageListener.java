@@ -17,20 +17,12 @@
 
 package com.sparrow.rocketmq.impl;
 
-import com.sparrow.cache.CacheClient;
 import com.sparrow.constant.cache.KEY;
 import com.sparrow.core.spi.JsonFactory;
-import com.sparrow.exception.CacheConnectionException;
-import com.sparrow.mq.MQContainerProvider;
-import com.sparrow.mq.MQEvent;
-import com.sparrow.mq.MQHandler;
-import com.sparrow.mq.MQ_CLIENT;
-import com.sparrow.mq.QueueHandlerMappingContainer;
+import com.sparrow.mq.*;
 import com.sparrow.rocketmq.MessageConverter;
 import com.sparrow.support.latch.DistributedCountDownLatch;
-import com.sparrow.support.redis.impl.RedisDistributedCountDownLatch;
 import com.sparrow.utility.StringUtility;
-import java.util.List;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import org.apache.rocketmq.client.consumer.listener.MessageListenerConcurrently;
@@ -38,50 +30,50 @@ import org.apache.rocketmq.common.message.MessageExt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
 /**
  * Created by harry on 2017/6/14.
  */
 public class SparrowRocketMQMessageListener implements MessageListenerConcurrently {
-
-    public SparrowRocketMQMessageListener() {
-        System.out.println("init spring rocket mq message listener");
-    }
-
     private static Logger logger = LoggerFactory.getLogger(SparrowRocketMQMessageListener.class);
-
+    public SparrowRocketMQMessageListener() {
+        logger.info("init spring rocket mq message listener");
+    }
     private QueueHandlerMappingContainer queueHandlerMappingContainer = MQContainerProvider.getContainer();
     private MessageConverter messageConverter;
     private DistributedCountDownLatch distributedCountDownLatch;
-
-    public void setDistributedCountDownLatch(DistributedCountDownLatch distributedCountDownLatch) {
-        this.distributedCountDownLatch = distributedCountDownLatch;
-    }
 
     public void setQueueHandlerMappingContainer(QueueHandlerMappingContainer queueHandlerMappingContainer) {
         this.queueHandlerMappingContainer = queueHandlerMappingContainer;
     }
 
+    public void setDistributedCountDownLatch(DistributedCountDownLatch distributedCountDownLatch) {
+        this.distributedCountDownLatch = distributedCountDownLatch;
+    }
+
+
     public void setMessageConverter(MessageConverter messageConverter) {
         this.messageConverter = messageConverter;
     }
 
-    protected boolean before(MQEvent event, KEY monitor, String keys) {
+    protected boolean before(MQEvent event,KEY consumerKey, String keys) {
         if (distributedCountDownLatch == null) {
             return true;
         }
-        logger.info("starting sparrow consume {},monitor {}, keys {}...", JsonFactory.getProvider().toString(event), monitor == null ? "null" : monitor.key(), keys);
-        return monitor == null || distributedCountDownLatch.exist(monitor, keys);
+        logger.info("starting sparrow consume {}, keys {}...", JsonFactory.getProvider().toString(event), keys);
+        return distributedCountDownLatch == null || distributedCountDownLatch.consumable(consumerKey,keys);
     }
 
-    protected void after(MQEvent event, KEY monitor, String keys) {
+    protected void after(MQEvent event,KEY consumerKey,String keys) {
         if (distributedCountDownLatch == null) {
             return;
         }
-        logger.info("ending sparrow consume {},monitor {},keys {} ...", JsonFactory.getProvider().toString(event), monitor==null?"null":monitor.key(), keys);
-        if (StringUtility.isNullOrEmpty(monitor)) {
+        logger.info("ending sparrow consume {},consumerKey {},keys {} ...", JsonFactory.getProvider().toString(event), consumerKey==null?"null":consumerKey.key(), keys);
+        if (StringUtility.isNullOrEmpty(consumerKey)) {
             return;
         }
-        distributedCountDownLatch.consume(monitor,keys);
+        distributedCountDownLatch.consume(consumerKey,keys);
     }
 
     @Override
@@ -99,12 +91,12 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
             }
             try {
                 MQEvent event = messageConverter.fromMessage(message);
-                KEY monitor = KEY.parse(message.getProperties().get(MQ_CLIENT.MONITOR_KEY));
-                if (!this.before(event, monitor, message.getKeys())) {
+                KEY consumerKey = KEY.parse(message.getProperties().get(MQ_CLIENT.CONSUMER_KEY));
+                if (!this.before(event, consumerKey,message.getKeys())) {
                     return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
                 }
                 handler.handle(event);
-                this.after(event, monitor, message.getKeys());
+                this.after(event, consumerKey, message.getKeys());
             } catch (Throwable e) {
                 logger.error("message error", e);
             }

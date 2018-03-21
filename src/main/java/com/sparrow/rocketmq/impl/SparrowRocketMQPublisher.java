@@ -108,28 +108,28 @@ public class SparrowRocketMQPublisher implements MQPublisher {
         this.debug = debug;
     }
 
-    public void after(MQEvent event, KEY monitor, String msgKey) {
-        if (distributedCountDownLatch == null||monitor==null) {
+    public void after(MQEvent event, KEY productKey, String msgKey) {
+        if (distributedCountDownLatch == null||productKey==null) {
             return;
         }
-        distributedCountDownLatch.product(monitor,msgKey);
+        distributedCountDownLatch.product(productKey,msgKey);
     }
 
     @Override
     public void publish(MQEvent event) {
-        this.publish(event, null);
+        this.publish(event, null,null);
     }
 
     @Override
-    public void publish(MQEvent event, KEY monitor) {
+    public void publish(MQEvent event, KEY productKey,KEY consumerKey) {
 
         Message msg = this.messageConverter.createMessage(topic, tag, event);
         String key = UUID.randomUUID().toString();
         msg.setKeys(Collections.singletonList(key));
-        if (monitor != null) {
-            msg.getProperties().put(MQ_CLIENT.MONITOR_KEY, monitor.key());
+        if (consumerKey != null) {
+            msg.getProperties().put(MQ_CLIENT.CONSUMER_KEY, consumerKey.key());
         }
-        logger.info("event {} ,key {},msgKey {}", JsonFactory.getProvider().toString(event), monitor.key(), key);
+        logger.info("event {} ,monitor key {},msgKey {}", JsonFactory.getProvider().toString(event), productKey==null?"":productKey.key(), key);
         SendResult sendResult = null;
         int retryTimes = 0;
         while (retryTimes < retryTimesWhenSendAsyncFailed) {
@@ -146,7 +146,7 @@ public class SparrowRocketMQPublisher implements MQPublisher {
                         throw new MQMessageSendException(sendResult.toString());
                     }
                 }
-                this.after(event, monitor, key);
+                this.after(event, productKey, key);
                 break;
             } catch (Throwable e) {
                 logger.warn(e.getClass().getSimpleName() + " retry", e);
