@@ -26,8 +26,10 @@ import com.sparrow.mq.MQPublisher;
 import com.sparrow.mq.MQ_CLIENT;
 import com.sparrow.rocketmq.MessageConverter;
 import com.sparrow.support.latch.DistributedCountDownLatch;
+
 import java.util.Collections;
 import java.util.UUID;
+
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.DefaultMQProducer;
 import org.apache.rocketmq.client.producer.MQProducer;
@@ -109,19 +111,20 @@ public class SparrowRocketMQPublisher implements MQPublisher {
     }
 
     public void after(MQEvent event, KEY productKey, String msgKey) {
-        if (distributedCountDownLatch == null||productKey==null) {
+        if (distributedCountDownLatch == null || productKey == null) {
             return;
         }
-        distributedCountDownLatch.product(productKey,msgKey);
+        distributedCountDownLatch.product(productKey, msgKey);
     }
 
     @Override
     public void publish(MQEvent event) {
-        this.publish(event, null,null);
+        this.publish(event, null, null);
     }
 
+
     @Override
-    public void publish(MQEvent event, KEY productKey,KEY consumerKey) {
+    public void publish(MQEvent event, KEY productKey, KEY consumerKey) {
 
         Message msg = this.messageConverter.createMessage(topic, tag, event);
         String key = UUID.randomUUID().toString();
@@ -129,7 +132,7 @@ public class SparrowRocketMQPublisher implements MQPublisher {
         if (consumerKey != null) {
             msg.getProperties().put(MQ_CLIENT.CONSUMER_KEY, consumerKey.key());
         }
-        logger.info("event {} ,monitor key {},msgKey {}", JsonFactory.getProvider().toString(event), productKey==null?"":productKey.key(), key);
+        logger.info("event {} ,monitor key {},msgKey {}", JsonFactory.getProvider().toString(event), productKey == null ? "" : productKey.key(), key);
         SendResult sendResult = null;
         int retryTimes = 0;
         while (retryTimes < retryTimesWhenSendAsyncFailed) {
@@ -138,13 +141,9 @@ public class SparrowRocketMQPublisher implements MQPublisher {
                 logger.warn("event {} retry times {}", event, retryTimes);
             }
             try {
-                if (this.debug != null && this.debug) {
-                    logger.debug("sparrow rocket mq sender debug,msg:{}", msg);
-                } else {
-                    sendResult = producer.send(msg);
-                    if (!sendResult.getSendStatus().equals(SendStatus.SEND_OK)) {
-                        throw new MQMessageSendException(sendResult.toString());
-                    }
+                sendResult = producer.send(msg);
+                if (!sendResult.getSendStatus().equals(SendStatus.SEND_OK)) {
+                    throw new MQMessageSendException(sendResult.toString());
                 }
                 this.after(event, productKey, key);
                 break;
