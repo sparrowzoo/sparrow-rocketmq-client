@@ -119,18 +119,17 @@ public class SparrowRocketMQPublisher implements MQPublisher {
 
     @Override
     public void publish(MQEvent event) {
-        this.publish(event, null, null);
+        this.publish(event, null);
     }
 
 
     @Override
-    public void publish(MQEvent event, KEY productKey, KEY consumerKey) {
-
+    public void publish(MQEvent event, KEY productKey) {
         Message msg = this.messageConverter.createMessage(topic, tag, event);
         String key = UUID.randomUUID().toString();
         msg.setKeys(Collections.singletonList(key));
-        if (consumerKey != null) {
-            msg.getProperties().put(MQ_CLIENT.CONSUMER_KEY, consumerKey.key());
+        if (productKey != null) {
+            msg.getProperties().put(MQ_CLIENT.CONSUMER_KEY, productKey.key());
         }
         logger.info("event {} ,monitor key {},msgKey {}", JsonFactory.getProvider().toString(event), productKey == null ? "" : productKey.key(), key);
         SendResult sendResult = null;

@@ -18,7 +18,9 @@
 package com.sparrow.rocketmq.impl;
 
 import com.sparrow.constant.cache.KEY;
+import com.sparrow.constant.cache.key.KEY_MQ_IDEMPOTENT;
 import com.sparrow.core.spi.JsonFactory;
+import com.sparrow.exception.CacheConnectionException;
 import com.sparrow.mq.*;
 import com.sparrow.rocketmq.MessageConverter;
 import com.sparrow.support.latch.DistributedCountDownLatch;
@@ -37,12 +39,16 @@ import java.util.List;
  */
 public class SparrowRocketMQMessageListener implements MessageListenerConcurrently {
     private static Logger logger = LoggerFactory.getLogger(SparrowRocketMQMessageListener.class);
+
     public SparrowRocketMQMessageListener() {
         logger.info("init spring rocket mq message listener");
     }
+
     private QueueHandlerMappingContainer queueHandlerMappingContainer = MQContainerProvider.getContainer();
     private MessageConverter messageConverter;
     private DistributedCountDownLatch distributedCountDownLatch;
+
+    private MQIdempotent mqIdempotent;
 
     public void setQueueHandlerMappingContainer(QueueHandlerMappingContainer queueHandlerMappingContainer) {
         this.queueHandlerMappingContainer = queueHandlerMappingContainer;
@@ -52,28 +58,25 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
         this.distributedCountDownLatch = distributedCountDownLatch;
     }
 
+    public void setMqIdempotent(MQIdempotent mqIdempotent) {
+        this.mqIdempotent = mqIdempotent;
+    }
 
     public void setMessageConverter(MessageConverter messageConverter) {
         this.messageConverter = messageConverter;
     }
 
-    protected boolean before(MQEvent event,KEY consumerKey, String keys) {
-        if (distributedCountDownLatch == null) {
-            return true;
-        }
-        logger.info("starting sparrow consume {}, keys {}...", JsonFactory.getProvider().toString(event), keys);
-        return distributedCountDownLatch == null || distributedCountDownLatch.consumable(consumerKey,keys);
+    protected boolean duplicate(MQEvent event, KEY consumerKey, String keys) {
+        return mqIdempotent != null && mqIdempotent.duplicate(keys);
     }
 
-    protected void after(MQEvent event,KEY consumerKey,String keys) {
-        if (distributedCountDownLatch == null) {
-            return;
+    protected void consumed(MQEvent event, KEY consumerKey, String keys) {
+        if (distributedCountDownLatch != null && consumerKey != null) {
+            distributedCountDownLatch.consume(consumerKey, keys);
         }
-        logger.info("ending sparrow consume {},consumerKey {},keys {} ...", JsonFactory.getProvider().toString(event), consumerKey==null?"null":consumerKey.key(), keys);
-        if (StringUtility.isNullOrEmpty(consumerKey)) {
-            return;
+        if (mqIdempotent != null) {
+            mqIdempotent.consumed(keys);
         }
-        distributedCountDownLatch.consume(consumerKey,keys);
     }
 
     @Override
@@ -86,20 +89,18 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
             }
             MQHandler handler = queueHandlerMappingContainer.get(type);
             if (handler == null) {
-                logger.warn("handler of this type [{}] not found",type);
+                logger.warn("handler of this type [{}] not found", type);
                 return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
             }
-            try {
-                MQEvent event = messageConverter.fromMessage(message);
-                KEY consumerKey = KEY.parse(message.getProperties().get(MQ_CLIENT.CONSUMER_KEY));
-                if (!this.before(event, consumerKey,message.getKeys())) {
-                    return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
-                }
-                handler.handle(event);
-                this.after(event, consumerKey, message.getKeys());
-            } catch (Throwable e) {
-                logger.error("message error", e);
+
+            MQEvent event = messageConverter.fromMessage(message);
+            KEY consumerKey = KEY.parse(message.getProperties().get(MQ_CLIENT.CONSUMER_KEY));
+            if (this.duplicate(event, consumerKey, message.getKeys())) {
+                return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
             }
+            handler.handle(event);
+            this.consumed(event, consumerKey, message.getKeys());
+
         } catch (Throwable e) {
             logger.error("process failed, msg : " + message, e);
             return ConsumeConcurrentlyStatus.RECONSUME_LATER;
