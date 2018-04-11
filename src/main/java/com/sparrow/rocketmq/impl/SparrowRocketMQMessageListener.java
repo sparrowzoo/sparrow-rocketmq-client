@@ -71,11 +71,17 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
     }
 
     protected void consumed(MQEvent event, KEY consumerKey, String keys) {
+        //must be idempotent
+        if (mqIdempotent == null) {
+            return;
+        }
+        //must be consume successful
+        if (!mqIdempotent.consumed(keys)) {
+            return;
+        }
+        //count down
         if (distributedCountDownLatch != null && consumerKey != null) {
             distributedCountDownLatch.consume(consumerKey, keys);
-        }
-        if (mqIdempotent != null) {
-            mqIdempotent.consumed(keys);
         }
     }
 
