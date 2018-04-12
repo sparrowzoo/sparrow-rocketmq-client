@@ -110,6 +110,15 @@ public class SparrowRocketMQPublisher implements MQPublisher {
         this.debug = debug;
     }
 
+    /**
+     * 发送后count+1
+     * 如果有多个consumer 则+n
+     * 每个consumer 由不同的应用（进程处理）
+     *
+     * @param event
+     * @param productKey
+     * @param msgKey
+     */
     public void after(MQEvent event, KEY productKey, String msgKey) {
         if (distributedCountDownLatch == null || productKey == null) {
             return;
