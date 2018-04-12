@@ -18,21 +18,21 @@
 package com.sparrow.rocketmq.impl;
 
 import com.sparrow.constant.cache.KEY;
-import com.sparrow.constant.cache.key.KEY_MQ_IDEMPOTENT;
-import com.sparrow.core.spi.JsonFactory;
-import com.sparrow.exception.CacheConnectionException;
-import com.sparrow.mq.*;
+import com.sparrow.mq.MQContainerProvider;
+import com.sparrow.mq.MQEvent;
+import com.sparrow.mq.MQHandler;
+import com.sparrow.mq.MQIdempotent;
+import com.sparrow.mq.MQ_CLIENT;
+import com.sparrow.mq.QueueHandlerMappingContainer;
 import com.sparrow.rocketmq.MessageConverter;
 import com.sparrow.support.latch.DistributedCountDownLatch;
-import com.sparrow.utility.StringUtility;
+import java.util.List;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import org.apache.rocketmq.client.consumer.listener.MessageListenerConcurrently;
 import org.apache.rocketmq.common.message.MessageExt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.List;
 
 /**
  * Created by harry on 2017/6/14.
@@ -71,11 +71,17 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
     }
 
     protected void consumed(MQEvent event, KEY consumerKey, String keys) {
+        //must be idempotent
+        if (mqIdempotent == null) {
+            return;
+        }
+        //must be consume successful
+        if (!mqIdempotent.consumed(keys)) {
+            return;
+        }
+        //count down
         if (distributedCountDownLatch != null && consumerKey != null) {
             distributedCountDownLatch.consume(consumerKey, keys);
-        }
-        if (mqIdempotent != null) {
-            mqIdempotent.consumed(keys);
         }
     }
 
