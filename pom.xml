@@ -20,19 +20,18 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
-        <artifactId>sparrow-super</artifactId>
+        <artifactId>sparrow-bom</artifactId>
         <groupId>com.sparrow</groupId>
         <version>1.0</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>sparrow-rocketmq-client</artifactId>
     <name>${project.artifactId}</name>
-    <version>1.0-SNAPSHOT</version>
+    <version>${sparrow_rocketmq_client_version}</version>
     <dependencies>
         <dependency>
             <groupId>com.sparrow</groupId>
             <artifactId>sparrow</artifactId>
-            <version>${sparrow_version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.rocketmq</groupId>
