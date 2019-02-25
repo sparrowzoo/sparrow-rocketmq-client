@@ -23,7 +23,7 @@ import com.sparrow.mq.MQEvent;
 import com.sparrow.mq.MQHandler;
 import com.sparrow.mq.MQIdempotent;
 import com.sparrow.mq.MQ_CLIENT;
-import com.sparrow.mq.QueueHandlerMappingContainer;
+import com.sparrow.mq.EventHandlerMappingContainer;
 import com.sparrow.rocketmq.MessageConverter;
 import com.sparrow.support.latch.DistributedCountDownLatch;
 import java.util.List;
@@ -44,13 +44,13 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
         logger.info("init spring rocket mq message listener");
     }
 
-    private QueueHandlerMappingContainer queueHandlerMappingContainer = MQContainerProvider.getContainer();
+    private EventHandlerMappingContainer queueHandlerMappingContainer = MQContainerProvider.getContainer();
     private MessageConverter messageConverter;
     private DistributedCountDownLatch distributedCountDownLatch;
 
     private MQIdempotent mqIdempotent;
 
-    public void setQueueHandlerMappingContainer(QueueHandlerMappingContainer queueHandlerMappingContainer) {
+    public void setQueueHandlerMappingContainer(EventHandlerMappingContainer queueHandlerMappingContainer) {
         this.queueHandlerMappingContainer = queueHandlerMappingContainer;
     }
 
