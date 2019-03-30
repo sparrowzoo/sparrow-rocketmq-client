@@ -24,6 +24,7 @@ import com.sparrow.mq.MQEvent;
 import com.sparrow.mq.MQHandler;
 import com.sparrow.mq.MQIdempotent;
 import com.sparrow.mq.MQ_CLIENT;
+import com.sparrow.mq.EventHandlerMappingContainer;
 import com.sparrow.rocketmq.MessageConverter;
 import com.sparrow.support.latch.DistributedCountDownLatch;
 import java.util.List;
