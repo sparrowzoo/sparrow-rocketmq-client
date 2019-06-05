@@ -28,14 +28,13 @@ import com.sparrow.rocketmq.MessageConverter;
 import com.sparrow.support.latch.DistributedCountDownLatch;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 import org.apache.rocketmq.client.exception.MQClientException;
-import org.apache.rocketmq.client.producer.DefaultMQProducer;
-import org.apache.rocketmq.client.producer.MQProducer;
-import org.apache.rocketmq.client.producer.SendResult;
-import org.apache.rocketmq.client.producer.SendStatus;
+import org.apache.rocketmq.client.producer.*;
 import org.apache.rocketmq.common.message.Message;
+import org.apache.rocketmq.common.message.MessageQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,6 +149,15 @@ public class SparrowRocketMQPublisher implements MQPublisher {
             }
             try {
                 sendResult = producer.send(msg);
+                /**
+                 * , new MessageQueueSelector() {
+                 *                     @Override
+                 *                     public MessageQueue select(List<MessageQueue> list, Message message, Object o) {
+                 *                         list.get(0).getQueueId()
+                 *                         return null;
+                 *                     }
+                 *                 },event
+                 */
                 if (!sendResult.getSendStatus().equals(SendStatus.SEND_OK)) {
                     throw new MQMessageSendException(sendResult.toString());
                 }
