@@ -61,6 +61,13 @@ public class RocketMQConsumer implements ContainerAware{
 
     private Integer threadCount;
 
+    private int batchSize=1;
+    private int pullSize;
+
+    private long pullInterval=0;
+
+
+
 
     /**
      * 消费线程的数量
@@ -102,6 +109,18 @@ public class RocketMQConsumer implements ContainerAware{
 
     public void setMessageModel(String messageModel) {
         this.messageModel = messageModel;
+    }
+
+    public void setBatchSize(int batchSize) {
+        this.batchSize = batchSize;
+    }
+
+    public void setPullSize(int pullSize) {
+        this.pullSize = pullSize;
+    }
+
+    public void setPullInterval(long pullInterval) {
+        this.pullInterval = pullInterval;
     }
 
     public List<TopicTagPair> getTopicConfigList() {
@@ -149,7 +168,7 @@ public class RocketMQConsumer implements ContainerAware{
 
     public synchronized void start() {
         try {
-            consumer = createConsumer();
+            consumer = createConsumer(this.batchSize,this.pullSize);
             log.info("begin start ROCKET MQ client, group={}, nameServerAddr, topic={},config={}", groupName, nameServerAddress, topicConfig, consumer);
             consumer.start();
         } catch (Exception e) {
@@ -185,17 +204,20 @@ public class RocketMQConsumer implements ContainerAware{
                 defaultMQPushConsumer.setConsumeMessageBatchMaxSize(batchSize);
             }
             if (pullSize != null && pullSize > 0) {
+                System.err.println("pull size:"+pullSize);
                 defaultMQPushConsumer.setPullBatchSize(pullSize);
             }
             //消费一批消息，最大数。因为一批消息如果有一个失败，都会失败，所以这里设置为1
-            defaultMQPushConsumer.setConsumeMessageBatchMaxSize(1);
-            setConsumeThread(defaultMQPushConsumer);
+            //defaultMQPushConsumer.setConsumeMessageBatchMaxSize(1);
+            //setConsumeThread(defaultMQPushConsumer);
             //订阅多个topic
             for (TopicTagPair topicTagPair : this.getTopicConfigList()) {
                 defaultMQPushConsumer.subscribe(topicTagPair.getTopic(), StringUtility.join(topicTagPair.getTags(), SYMBOL.VERTICAL_LINE));
             }
             defaultMQPushConsumer.setInstanceName(getInstanceName() + SYMBOL.UNDERLINE + groupName);
             defaultMQPushConsumer.registerMessageListener(messageListener);
+            defaultMQPushConsumer.setPullInterval(this.pullInterval);
+            defaultMQPushConsumer.setConsumeThreadMin(this.threadCount);
             log.info("finished rocket mq client start!");
             return defaultMQPushConsumer;
         } catch (Exception e) {

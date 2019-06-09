@@ -87,29 +87,32 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
 
     @Override
     public ConsumeConcurrentlyStatus consumeMessage(List<MessageExt> list, ConsumeConcurrentlyContext context) {
-        MessageExt message = list.get(0);
-        String type = message.getProperties().get(MQ_CLIENT.CLASS_NAME);
-        try {
-            if (logger.isInfoEnabled()) {
-                logger.info("receive msg:" + message.toString());
-            }
-            MQHandler handler = queueHandlerMappingContainer.get(type);
-            if (handler == null) {
-                logger.warn("handler of this type [{}] not found", type);
-                return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
-            }
+        System.err.println(String.format("thread-name:%s,message-size:%s",Thread.currentThread().getName(),list.size()));
+        logger.info("thread-name:{},message-size:{}",Thread.currentThread().getName(),list.size());
+        for (MessageExt message : list) {
+            String type = message.getProperties().get(MQ_CLIENT.CLASS_NAME);
+            try {
+                if (logger.isInfoEnabled()) {
+                    logger.info("receive msg:" + message.toString());
+                }
+                MQHandler handler = queueHandlerMappingContainer.get(type);
+                if (handler == null) {
+                    logger.warn("handler of this type [{}] not found", type);
+                    return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
+                }
 
-            MQEvent event = messageConverter.fromMessage(message);
-            KEY consumerKey = KEY.parse(message.getProperties().get(MQ_CLIENT.CONSUMER_KEY));
-            if (this.duplicate(event, consumerKey, message.getKeys())) {
-                return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
-            }
-            handler.handle(event);
-            this.consumed(event, consumerKey, message.getKeys());
+                MQEvent event = messageConverter.fromMessage(message);
+                KEY consumerKey = KEY.parse(message.getProperties().get(MQ_CLIENT.CONSUMER_KEY));
+                if (this.duplicate(event, consumerKey, message.getKeys())) {
+                    return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
+                }
+                handler.handle(event);
+                this.consumed(event, consumerKey, message.getKeys());
 
-        } catch (Throwable e) {
-            logger.error("process failed, msg : " + message, e);
-            return ConsumeConcurrentlyStatus.RECONSUME_LATER;
+            } catch (Throwable e) {
+                logger.error("process failed, msg : " + message, e);
+                return ConsumeConcurrentlyStatus.RECONSUME_LATER;
+            }
         }
         return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
     }
