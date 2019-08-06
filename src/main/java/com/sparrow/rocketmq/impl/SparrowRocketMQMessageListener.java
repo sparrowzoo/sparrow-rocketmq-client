@@ -26,7 +26,9 @@ import com.sparrow.mq.MQIdempotent;
 import com.sparrow.mq.MQ_CLIENT;
 import com.sparrow.rocketmq.MessageConverter;
 import com.sparrow.support.latch.DistributedCountDownLatch;
+
 import java.util.List;
+
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import org.apache.rocketmq.client.consumer.listener.MessageListenerConcurrently;
@@ -77,8 +79,10 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
         }
         //must be consume successful
         if (!mqIdempotent.consumed(keys)) {
+            //如果未消费成功，说明断网，或者已经被消费过
             return;
         }
+        //如果在这里断电，则count 数会少减,使用事务或脚本保证原子
         //count down
         if (distributedCountDownLatch != null && consumerKey != null) {
             distributedCountDownLatch.consume(consumerKey, keys);
@@ -87,8 +91,8 @@ public class SparrowRocketMQMessageListener implements MessageListenerConcurrent
 
     @Override
     public ConsumeConcurrentlyStatus consumeMessage(List<MessageExt> list, ConsumeConcurrentlyContext context) {
-        System.err.println(String.format("thread-name:%s,message-size:%s",Thread.currentThread().getName(),list.size()));
-        logger.info("thread-name:{},message-size:{}",Thread.currentThread().getName(),list.size());
+        System.err.println(String.format("thread-name:%s,message-size:%s", Thread.currentThread().getName(), list.size()));
+        logger.info("thread-name:{},message-size:{}", Thread.currentThread().getName(), list.size());
         for (MessageExt message : list) {
             String type = message.getProperties().get(MQ_CLIENT.CLASS_NAME);
             try {
